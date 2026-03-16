@@ -1,0 +1,6 @@
+@ComunicacaoEmRedeAps_HostAddress = http://localhost:5220
+
+GET {{ComunicacaoEmRedeAps_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
