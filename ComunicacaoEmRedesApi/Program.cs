@@ -1,8 +1,12 @@
+using ComunicacaoEmRedesApi.Domain.Models;
 using ComunicacaoEmRedesApi.Domain.Repositories;
 using ComunicacaoEmRedesApi.Domain.Services;
 using ComunicacaoEmRedesApi.Domain.Services.Interfaces;
 using ComunicacaoEmRedesApi.Infrastructure.Data;
 using ComunicacaoEmRedesApi.Infrastructure.Repositories;
+using ComunicacaoEmRedesApi.Infrastructure.Security;
+using ComunicacaoEmRedesApi.Infrastructure.Security.Interfaces;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +14,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<IPasswordEncryption, PasswordEncryption>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IChatRepository, ChatRepository>();
