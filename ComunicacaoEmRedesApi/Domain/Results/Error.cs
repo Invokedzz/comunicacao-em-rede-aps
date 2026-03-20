@@ -10,6 +10,18 @@ public class Error
     [JsonPropertyName("message")]
     public required string Message { get; set; }
 
+    public static Error Get(string code, string message)
+    {
+        return new Error
+        {
+            Code = code,
+            Message = message
+        };
+    }
+    
+    public static void AddErrorToTargetList(List<Error> target, string code, string message)
+        => target.Add(new Error{ Code = code, Message = message });
+    
     public struct Codes
     {
         public const string InvalidEmail = "INVALID_EMAIL";
