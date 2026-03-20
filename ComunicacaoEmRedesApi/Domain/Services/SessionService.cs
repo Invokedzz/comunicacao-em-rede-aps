@@ -21,16 +21,16 @@ public class SessionService : ISessionService
     
     public async Task<Result<RegisterResponseDto>> Register(RegisterRequestDto request)
     {
-        var domainErrors = SessionDomainValidations.GetRegisterErrors(request.Email, request.Password);
+        var registerDomainErrors = SessionDomainValidations.GetRegisterErrors(request.Email, request.Password);
 
-        if (domainErrors.Count > 0)
+        if (registerDomainErrors.Count > 0)
         {
-            return Result<RegisterResponseDto>.Failure(ErrorType.BadRequest, domainErrors);
+            return Result<RegisterResponseDto>.Failure(ErrorType.BadRequest, registerDomainErrors);
         }
 
         if (await DoesRequestedEmailAlreadyExists(request.Email))
         {
-            var conflictError = new Error { Code = Error.Codes.EmailAlreadyExists, Message = "This email already exists!" };
+            var conflictError = Error.Get(Error.Codes.EmailAlreadyExists, "This email already exists!");
             return Result<RegisterResponseDto>.Failure(ErrorType.Conflict, [conflictError]);
         }
         
@@ -63,32 +63,14 @@ public class SessionService : ISessionService
         public static List<Error> GetRegisterErrors(string email, string password)
         {
             var errors = new List<Error>();
+            
+            if (!IsEmailDomainValid(email)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidEmail, "Email domain is not valid!");
+            if (!IsPasswordLengthCorrect(password)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidPassword, "Password length must be between 8 and 15 characters!");
+            if (!IsPasswordStructureValid(password)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidPassword, "Password must contain letters, numbers and a special character!");
 
-            if (!IsEmailDomainValid(email))
-            {
-                errors.Add(new Error
-                {
-                    Code = Error.Codes.InvalidEmail, Message = "Email domain is not valid!"
-                });
-            }
-
-            if (!IsPasswordLengthCorrect(password))
-            {
-                errors.Add(new Error
-                {
-                    Code = Error.Codes.InvalidPassword, Message = "Password length must be between 8 and 15 characters!"
-                });
-            }
-
-            if (!IsPasswordStructureValid(password))
-            {
-                errors.Add(new Error
-                {
-                    Code = Error.Codes.InvalidPassword, Message = "Password must contain letters, numbers and a special character!"
-                });
-            }
-
-            return errors;
+            return errors.Select(a => a)
+                .OrderBy(a => a.Message)
+                .ToList();
         }
         
         private static bool IsEmailDomainValid(string email)
@@ -97,13 +79,11 @@ public class SessionService : ISessionService
             return DoesEmailEndsWithDomain(email, providers);
         }
 
-        private static bool DoesEmailEndsWithDomain(string email, IEnumerable<string> providers) =>
-            providers.Any(provider => email.EndsWith(provider + AvailableDomains.DotCom) || email.EndsWith(provider + AvailableDomains.DotComBr));
+        private static bool DoesEmailEndsWithDomain(string email, IEnumerable<string> providers) 
+            => providers.Any(provider => email.EndsWith(provider + AvailableDomains.DotCom) || email.EndsWith(provider + AvailableDomains.DotComBr));
 
-        private static bool IsPasswordLengthCorrect(string password)
-        {
-            return password.Length is >= 8 and <= 15;
-        }
+        private static bool IsPasswordLengthCorrect(string password) 
+            => password.Length is >= 8 and <= 15;
         
         private static bool IsPasswordStructureValid(string password)
         {

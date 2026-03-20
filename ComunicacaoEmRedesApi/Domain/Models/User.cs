@@ -14,7 +14,7 @@ public class User
     public required string Email { get; set; }
 
     public required string PasswordHash { get; set; }
-    
+
     public bool Active { get; set; }
 
     public ICollection<Chat> Chats { get; set; } = [];
