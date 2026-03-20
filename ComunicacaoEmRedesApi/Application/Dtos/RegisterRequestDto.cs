@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace ComunicacaoEmRedesApi.Application.Dtos;
@@ -5,8 +6,10 @@ namespace ComunicacaoEmRedesApi.Application.Dtos;
 public class RegisterRequestDto
 {
     [JsonPropertyName("email")]
+    [Required(ErrorMessage = "Email field is required!")]
     public required string Email { get; set; }
     
-    [JsonPropertyName("password")]
+    [JsonPropertyName("password")] 
+    [Required(ErrorMessage = "Password field is required!")]
     public required string Password { get; set; }
 }
