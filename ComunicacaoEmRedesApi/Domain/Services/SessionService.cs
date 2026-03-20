@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using ComunicacaoEmRedesApi.Application.Dtos;
 using ComunicacaoEmRedesApi.Domain.Enums;
 using ComunicacaoEmRedesApi.Domain.Models;
@@ -22,13 +21,19 @@ public class SessionService : ISessionService
     
     public async Task<Result<RegisterResponseDto>> Register(RegisterRequestDto request)
     {
-        var getErrors = SessionDomainValidations.GetRegisterErrors(request.Email, request.Password);
+        var domainErrors = SessionDomainValidations.GetRegisterErrors(request.Email, request.Password);
 
-        if (getErrors.Count > 0)
+        if (domainErrors.Count > 0)
         {
-            return Result<RegisterResponseDto>.Failure(getErrors);
+            return Result<RegisterResponseDto>.Failure(ErrorType.BadRequest, domainErrors);
         }
 
+        if (await DoesRequestedEmailAlreadyExists(request.Email))
+        {
+            var conflictError = new Error { Code = Error.Codes.EmailAlreadyExists, Message = "This email already exists!" };
+            return Result<RegisterResponseDto>.Failure(ErrorType.Conflict, [conflictError]);
+        }
+        
         var user = new User
         {
             Email = request.Email,
@@ -43,6 +48,11 @@ public class SessionService : ISessionService
         return Result<RegisterResponseDto>.Success(response);
     }
 
+    private async Task<bool> DoesRequestedEmailAlreadyExists(string email)
+    {
+        return await _userRepository.DoesEmailExists(email);
+    }
+    
     private string HashUserPassword(User user)
     {
         return _encryption.HashPassword(user, user.PasswordHash);
@@ -50,18 +60,32 @@ public class SessionService : ISessionService
     
     private static class SessionDomainValidations
     {
-        public static List<string> GetRegisterErrors(string email, string password)
+        public static List<Error> GetRegisterErrors(string email, string password)
         {
-            var errors = new List<string>();
+            var errors = new List<Error>();
 
             if (!IsEmailDomainValid(email))
             {
-                errors.Add("Email domain is not valid!");
+                errors.Add(new Error
+                {
+                    Code = Error.Codes.InvalidEmail, Message = "Email domain is not valid!"
+                });
+            }
+
+            if (!IsPasswordLengthCorrect(password))
+            {
+                errors.Add(new Error
+                {
+                    Code = Error.Codes.InvalidPassword, Message = "Password length must be between 8 and 15 characters!"
+                });
             }
 
             if (!IsPasswordStructureValid(password))
             {
-                errors.Add("Password must contain letters, numbers and a special character!");
+                errors.Add(new Error
+                {
+                    Code = Error.Codes.InvalidPassword, Message = "Password must contain letters, numbers and a special character!"
+                });
             }
 
             return errors;
@@ -73,32 +97,34 @@ public class SessionService : ISessionService
             return DoesEmailEndsWithDomain(email, providers);
         }
 
-        private static bool IsPasswordStructureValid(string password)
-        {
-            return SessionDomainRegex.PasswordDefaultPattern.IsMatch(password);
-        }
-
         private static bool DoesEmailEndsWithDomain(string email, IEnumerable<string> providers) =>
             providers.Any(provider => email.EndsWith(provider + AvailableDomains.DotCom) || email.EndsWith(provider + AvailableDomains.DotComBr));
 
+        private static bool IsPasswordLengthCorrect(string password)
+        {
+            return password.Length is >= 8 and <= 15;
+        }
+        
+        private static bool IsPasswordStructureValid(string password)
+        {
+            bool hasLetter = false, hasNumber = false, hasSpecialChar = false;
+            const string allowedSpecialChars = "._-@!?,:;()";
+            
+            foreach (var digit in password)
+            {
+                if (char.IsLetter(digit)) hasLetter = true;
+                else if (char.IsNumber(digit)) hasNumber = true;
+                else if (allowedSpecialChars.Contains(digit)) hasSpecialChar = true;
+                else return false;
+            }
+            
+            return hasLetter && hasNumber && hasSpecialChar;
+        }
+        
         private struct AvailableDomains
         {
             public const string DotCom = ".com";
             public const string DotComBr = ".com.br";
-        }
-    }
-
-    private static class SessionDomainRegex
-    {
-        private const int OneSecond = 1000;
-        private static readonly TimeSpan Interval = new(OneSecond);
-        
-        public static readonly Regex PasswordDefaultPattern 
-            = new(AvailableRegex.AllowLettersNumbersAndSomeSpecialChars, RegexOptions.Compiled, Interval);
-
-        private struct AvailableRegex
-        {
-            public const string AllowLettersNumbersAndSomeSpecialChars = "^[a-zA-Z0-9 _.\\-@!?,:;()]+$";
         }
     }
 }

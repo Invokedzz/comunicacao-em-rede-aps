@@ -20,11 +20,16 @@ public class UserRepository : IUserRepository
         await _context.Users.AddAsync(user);
     }
 
+    public async Task<bool> DoesEmailExists(string email)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .AnyAsync(e => e.Email == email);
+    }
+
     public async Task<Option<User>> GetUserByIdAsync(Guid id)
     {
-        var user = await _context.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(e => e.Id == id);
+        var user = await _context.Users.FirstOrDefaultAsync(e => e.Id == id);
 
         return user is null ? Option<User>.None : Option<User>.Some(user);
     }

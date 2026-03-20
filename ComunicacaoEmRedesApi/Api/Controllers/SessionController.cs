@@ -1,4 +1,5 @@
 using ComunicacaoEmRedesApi.Application.Dtos;
+using ComunicacaoEmRedesApi.Application.Extensions;
 using ComunicacaoEmRedesApi.Domain.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,15 +17,10 @@ public class SessionController : ControllerBase
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
+    public async Task<IResult> Register([FromBody] RegisterRequestDto request)
     {
         var response = await _sessionService.Register(request);
-        
-        if (response.IsSuccess)
-        {
-            return Ok(response);
-        }
+        return Results.Extensions.ToResultFormat(response);
+    }        
 
-        return BadRequest(response);
-    }
 }
