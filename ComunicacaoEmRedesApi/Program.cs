@@ -9,7 +9,8 @@ using ComunicacaoEmRedesApi.Infrastructure.Security.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using System.Threading.RateLimiting;
+using ComunicacaoEmRedesApi.Domain.Enums;
+using ComunicacaoEmRedesApi.Domain.Results;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,21 +24,32 @@ builder.Services.AddScoped<IPasswordEncryption, PasswordEncryption>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IChatRepository, ChatRepository>();
 builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<ITokenRepository, TokenRepository>();
 
 builder.Services.AddScoped<ISessionService, SessionService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite("Data Source=" + Path.Combine(builder.Environment.ContentRootPath, "app.db")));
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddFixedWindowLimiter("fixed", opt =>
+    options.AddFixedWindowLimiter(nameof(RateLimiterPolicies.SessionPolicy), opt =>
     {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 2;
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromSeconds(40);
+        opt.AutoReplenishment = true;
     });
-    options.RejectionStatusCode = 429;
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+        var timeoutResponse = Error.Get(Error.Codes.RequestLimitAchieved, Error.Messages.RequestLimitAchievedMessage);
+        await context.HttpContext.Response.WriteAsJsonAsync(Result<string>.Failure(ErrorType.TooManyRequests, [timeoutResponse]), cancellationToken: token);
+    };
 });
 
 var app = builder.Build();

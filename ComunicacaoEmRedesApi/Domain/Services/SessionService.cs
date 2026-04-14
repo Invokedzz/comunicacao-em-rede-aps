@@ -1,9 +1,10 @@
-using ComunicacaoEmRedesApi.Application.Dtos;
+using ComunicacaoEmRedesApi.Application.Dtos.Session;
 using ComunicacaoEmRedesApi.Domain.Enums;
 using ComunicacaoEmRedesApi.Domain.Models;
 using ComunicacaoEmRedesApi.Domain.Repositories;
 using ComunicacaoEmRedesApi.Domain.Results;
 using ComunicacaoEmRedesApi.Domain.Services.Interfaces;
+using ComunicacaoEmRedesApi.Domain.Validations;
 using ComunicacaoEmRedesApi.Infrastructure.Security.Interfaces;
 
 namespace ComunicacaoEmRedesApi.Domain.Services;
@@ -11,11 +12,13 @@ namespace ComunicacaoEmRedesApi.Domain.Services;
 public class SessionService : ISessionService
 {
     private readonly IUserRepository _userRepository;
+    private readonly ITokenService _tokenService;
     private readonly IPasswordEncryption _encryption;
 
-    public SessionService(IUserRepository userRepository, IPasswordEncryption encryption)
+    public SessionService(IUserRepository userRepository, ITokenService tokenService, IPasswordEncryption encryption)
     {
         _userRepository = userRepository;
+        _tokenService = tokenService;
         _encryption = encryption;
     }
     
@@ -34,17 +37,13 @@ public class SessionService : ISessionService
             return Result<RegisterResponseDto>.Failure(ErrorType.Conflict, [conflictError]);
         }
         
-        var user = new User
-        {
-            Email = request.Email,
-            PasswordHash = request.Password
-        };
+        var user = new User { Email = request.Email, PasswordHash = request.Password };
 
         user.PasswordHash = HashUserPassword(user);
         
         await _userRepository.SaveUserAsync(user);
         var response = RegisterResponseDto.Get(user.Email);
-
+        
         return Result<RegisterResponseDto>.Success(response);
     }
 
@@ -66,8 +65,15 @@ public class SessionService : ISessionService
             return Result<LoginResponseDto>.Failure(ErrorType.BadRequest, [error]);
         }
 
-        var response = LoginResponseDto.Get("", DateTime.Now);
+        var token = await _tokenService.ManageTokenCreationFlow(user.Id);
+        
+        var response = LoginResponseDto.Get($"Welcome, {user.Email.ToUpper()}", token, DateTime.UtcNow);
         return Result<LoginResponseDto>.Success(response);
+    }
+
+    public async Task Logout(Guid userId)
+    {
+        await _tokenService.SetTokenAsRevoked(userId);
     }
 
     private async Task<bool> DoesRequestedEmailAlreadyExists(string email)
@@ -84,55 +90,5 @@ public class SessionService : ISessionService
     {
         if (string.IsNullOrEmpty(requestPassword)) return false;
         return _encryption.VerifyPassword(user, user.PasswordHash, requestPassword);
-    }
-    
-    private static class SessionDomainValidations
-    {
-        public static List<Error> GetRegisterErrors(string email, string password)
-        {
-            var errors = new List<Error>();
-            
-            if (!IsEmailDomainValid(email)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidEmail, "Email domain is not valid!");
-            if (!IsPasswordLengthCorrect(password)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidPassword, "Password length must be between 8 and 15 characters!");
-            if (!IsPasswordStructureValid(password)) Error.AddErrorToTargetList(errors, Error.Codes.InvalidPassword, "Password must contain letters, numbers and a special character!");
-
-            return errors.Select(a => a)
-                .OrderBy(a => a.Message)
-                .ToList();
-        }
-        
-        private static bool IsEmailDomainValid(string email)
-        {
-            var providers = Enum.GetNames<AvailableEmailProviders>().Select(e => e.ToLower());
-            return DoesEmailEndsWithDomain(email, providers);
-        }
-
-        private static bool DoesEmailEndsWithDomain(string email, IEnumerable<string> providers) 
-            => providers.Any(provider => email.EndsWith(provider + AvailableDomains.DotCom) || email.EndsWith(provider + AvailableDomains.DotComBr));
-
-        private static bool IsPasswordLengthCorrect(string password) 
-            => password.Length is >= 8 and <= 15;
-        
-        private static bool IsPasswordStructureValid(string password)
-        {
-            bool hasLetter = false, hasNumber = false, hasSpecialChar = false;
-            const string allowedSpecialChars = "._-@!?,:;()";
-            
-            foreach (var digit in password)
-            {
-                if (char.IsLetter(digit)) hasLetter = true;
-                else if (char.IsNumber(digit)) hasNumber = true;
-                else if (allowedSpecialChars.Contains(digit)) hasSpecialChar = true;
-                else return false;
-            }
-            
-            return hasLetter && hasNumber && hasSpecialChar;
-        }
-        
-        private struct AvailableDomains
-        {
-            public const string DotCom = ".com";
-            public const string DotComBr = ".com.br";
-        }
     }
 }
