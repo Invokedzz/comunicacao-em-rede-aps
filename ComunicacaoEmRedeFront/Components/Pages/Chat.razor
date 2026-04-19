@@ -1,13 +1,16 @@
-﻿@page "/chat"
+@page "/chat"
 @rendermode InteractiveServer
 @inject NavigationManager Nav
 @inject HttpClient Http
-@inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <h3>Chat</h3>
 
-@if (!conectado)
+@if (carregando)
+{
+    <p>Carregando...</p>
+}
+else if (!conectado)
 {
     <p>Conectando ao chat...</p>
 }
@@ -38,18 +41,46 @@ else
     private string textoMensagem = "";
     private string erro = "";
     private bool conectado = false;
+    private bool carregando = true;
 
-    // Esses valores virão da sessão — por enquanto hardcoded para teste
-    // Substituir pelo userId/email real vindos do cookie/sessão
-    private Guid userId = Guid.NewGuid(); // TODO: pegar da sessão
-    private string email = "usuario@teste.com"; // TODO: pegar da sessão
-    private Guid chatId = Guid.Parse("00000000-0000-0000-0000-000000000001"); // TODO: criar/buscar chat real
+    private Guid userId;
+    private string email = "";
+    private Guid chatId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            await CarregarUsuarioAsync();
+        }
+    }
+
+    private async Task CarregarUsuarioAsync()
+    {
+        try
+        {
+            var response = await Http.GetAsync("/v1/session/me");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/login");
+                return;
+            }
+
+            var data = await response.Content.ReadFromJsonAsync<MeResponse>();
+            userId = data!.Id;
+            email = data.Email;
+
+            carregando = false;
+            StateHasChanged();
+
             await ConectarAsync();
+        }
+        catch (Exception ex)
+        {
+            erro = $"Erro ao carregar sessão: {ex.Message}";
+            carregando = false;
+            StateHasChanged();
         }
     }
 
@@ -61,7 +92,6 @@ else
             await _tcpClient.ConnectAsync("localhost", 5002);
             _stream = _tcpClient.GetStream();
 
-            // Envia autenticação
             var auth = System.Text.Json.JsonSerializer.Serialize(new
             {
                 UserId = userId,
@@ -74,7 +104,6 @@ else
             conectado = true;
             StateHasChanged();
 
-            // Inicia leitura de mensagens em background
             _ = ReceberMensagensAsync();
         }
         catch (Exception ex)
@@ -127,4 +156,6 @@ else
         _stream?.Close();
         _tcpClient?.Close();
     }
+
+    private record MeResponse(Guid Id, string Email);
 }
