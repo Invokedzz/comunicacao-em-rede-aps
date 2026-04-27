@@ -18,6 +18,7 @@ public class MessageRepository : IMessageRepository
     public async Task SaveMessageAsync(Message message)
     {
         await _context.Messages.AddAsync(message);
+        await _context.SaveChangesAsync();
     }
 
     public async Task<Option<Message>> GetMessageByIdAsync(Guid id)
@@ -27,5 +28,13 @@ public class MessageRepository : IMessageRepository
             .FirstOrDefaultAsync(e => e.Id == id);
 
         return message is null ? Option<Message>.None : Option<Message>.Some(message);
+    }
+
+    public async Task<List<Message>> GetMessagesByChatIdAsync(Guid chatId)
+    {
+        return await _context.Messages
+            .Where(m => m.ChatId == chatId)
+            .OrderBy(m => m.CreatedAt)
+            .ToListAsync();
     }
 }

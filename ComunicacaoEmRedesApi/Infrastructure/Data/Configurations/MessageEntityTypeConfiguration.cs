@@ -40,5 +40,9 @@ public class MessageEntityTypeConfiguration : IEntityTypeConfiguration<Message>
             .HasColumnName(DefaultSchemaProperties.ColumnNames.ContentColumnName)
             .HasMaxLength(DefaultSchemaProperties.ColumnProperties.ContentMaxLength)
             .IsRequired();
+
+        builder.Property(e => e.CreatedAt)
+            .HasColumnName(DefaultSchemaProperties.ColumnNames.CreatedAtColumnName)
+            .IsRequired();
     }
 }

@@ -25,6 +25,7 @@ public struct DefaultSchemaProperties
         public const string ContentColumnName = "content";
         public const string ChatIdColumnName = "chat_id";
         public const string UserIdColumnName = "user_id";
+        public const string CreatedAtColumnName = "created_at";
         
         // Chat columns
         public const string TitleColumnName = "title";
