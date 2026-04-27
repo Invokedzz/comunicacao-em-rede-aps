@@ -7,4 +7,5 @@ public interface IMessageRepository
 {
     Task SaveMessageAsync(Message message);
     Task<Option<Message>> GetMessageByIdAsync(Guid id);
+    Task<List<Message>> GetMessagesByChatIdAsync(Guid chatId);
 }

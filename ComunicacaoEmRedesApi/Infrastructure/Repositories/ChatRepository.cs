@@ -18,6 +18,7 @@ public class ChatRepository : IChatRepository
     public async Task SaveChatAsync(Chat chat)
     {
         await _context.Chats.AddAsync(chat);
+        await _context.SaveChangesAsync();
     }
 
     public async Task<Option<Chat>> GetChatByIdAsync(Guid id)
