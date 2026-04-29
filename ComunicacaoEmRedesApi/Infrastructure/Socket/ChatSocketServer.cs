@@ -195,7 +195,8 @@ public class ChatSocketServer : BackgroundService
                 Content = content,
                 Active = true,
                 ChatId = chatId,
-                UserId = userId
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow
             };
             await messageRepo.SaveMessageAsync(message);
         });
